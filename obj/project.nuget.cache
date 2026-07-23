@@ -1,0 +1,17 @@
+{
+  "version": 2,
+  "dgSpecHash": "UaTfRG1NwW4=",
+  "success": false,
+  "projectFilePath": "C:\\Users\\Kinoshta\\source\\repos\\PruebaTecnicaGabriel\\PruebaTecnicaGabriel\\PruebaTecnicaGabriel.csproj",
+  "expectedPackageFiles": [],
+  "logs": [
+    {
+      "code": "NU1302",
+      "level": "Error",
+      "message": "Está ejecutando la operación \"restore\" con un origen \"HTTP\" http://192.168.1.50:8080/nuget. NuGet requiere orígenes HTTPS. Para usar un origen HTTP, es necesario establecer explícitamente \"allowInsecureConnections\" en verdadero en el archivo NuGet.Config. Consulte https://aka.ms/nuget-https-everywhere para obtener más información.",
+      "projectPath": "C:\\Users\\Kinoshta\\source\\repos\\PruebaTecnicaGabriel\\PruebaTecnicaGabriel\\PruebaTecnicaGabriel.csproj",
+      "filePath": "C:\\Users\\Kinoshta\\source\\repos\\PruebaTecnicaGabriel\\PruebaTecnicaGabriel\\PruebaTecnicaGabriel.csproj",
+      "targetGraphs": []
+    }
+  ]
+}
