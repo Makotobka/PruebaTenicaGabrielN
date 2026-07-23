@@ -1,0 +1,15 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Compilación de .NET
+bin/
+obj/
+
+# Configuración local
+*.userosscache
+*.sln.docstates
+
+# Logs
+*.log
