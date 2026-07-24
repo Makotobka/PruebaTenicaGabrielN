@@ -7,7 +7,7 @@ namespace PruebaTecnicaGabriel.Services
     public sealed class ContenedorPagos
     {
         private readonly ConcurrentDictionary<string, Cls_Pago> _payments = new(StringComparer.OrdinalIgnoreCase);
-        private const int MaximoIntentos = 2;
+        private const int MaximoIntentos = 6;
         public (Cls_Pago pago, bool creado) GetOrCreate(
             CreacionSolicitudPago request, 
             string Nodo

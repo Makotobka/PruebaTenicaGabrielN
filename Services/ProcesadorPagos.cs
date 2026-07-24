@@ -83,7 +83,7 @@ namespace PruebaTecnicaGabriel.Services
                 pago,
                 cancellationToken);
 
-            var segundos = Random.Shared.Next(5, 11);
+            var segundos = Random.Shared.Next(5, 15);
 
             _log.LogInformation(
                 "[{NodeId}] Procesando {TransactionId}. Intento {Attempt}. Duración: {Seconds} segundos",
@@ -96,22 +96,19 @@ namespace PruebaTecnicaGabriel.Services
                 TimeSpan.FromSeconds(segundos),
                 cancellationToken);
 
-            var forzarPrimerFallo =
-                _configuration.GetValue<bool>(
-                    "Simulacion:ForzarFalloPrimerIntento");
+            //var forzarPrimerFallo =
+            //    _configuration.GetValue<bool>(
+            //        "Simulacion:ForzarFalloPrimerIntento");
 
             bool debeFallar;
 
             lock (pago)
             {
-                // Solamente el primer intento puede fallar.
-                // El siguiente nodo completará el segundo intento.
-                debeFallar =
-                    pago.NumeroIntento == 1 &&
-                    (
-                        forzarPrimerFallo ||
-                        Random.Shared.Next(0, 100) < 50
-                    );
+                // Primero intento de cada peticion.
+                //if(pago.NumeroIntento == 1)
+
+                // Probabilidad de fallo 50%
+                debeFallar = Random.Shared.Next(0, 100) < 50;
             }
 
             if (!debeFallar)
