@@ -11,18 +11,22 @@ namespace PruebaTecnicaGabriel.Controllers
         private readonly ContenedorPagos _contenedor;
         private readonly EncolamientoPagosPendiente _cola;
         private readonly IConfiguration _configuration;
+        private readonly ClienteMallaNodos _malla;
         private readonly ILogger<PagoController> _log;
 
         public PagoController(
-        ContenedorPagos contenedor,
-        EncolamientoPagosPendiente cola,
-        IConfiguration configuration,
-        ILogger<PagoController> logger)
+            ContenedorPagos contenedor,
+            EncolamientoPagosPendiente cola,
+            IConfiguration configuration,
+            ILogger<PagoController> logger,
+            ClienteMallaNodos malla
+        )
         {
             _contenedor = contenedor;
             _cola = cola;
             _configuration = configuration;
             _log = logger;
+            _malla = malla;
         }
 
         [HttpPost]
@@ -43,7 +47,7 @@ namespace PruebaTecnicaGabriel.Controllers
 
             var result = _contenedor.GetOrCreate(request, nodeId);
 
-            if (!result.existente)
+            if (!result.creado)
             {
                 _log.LogInformation(
                     "[{NodeId}] Solicitud repetida para {TransactionId}. Estado actual: {Status}",
@@ -58,6 +62,11 @@ namespace PruebaTecnicaGabriel.Controllers
                 "[{NodeId}] Transacción {TransactionId} recibida",
                 nodeId,
                 result.pago.TransaccionId);
+
+            await _malla.ReplicarAsync(
+                result.pago,
+                cancellationToken
+            );
 
             await _cola.ColaAsync(
                 result.pago.TransaccionId,

@@ -1,4 +1,5 @@
-﻿using PruebaTecnicaGabriel.Models;
+﻿using Microsoft.Extensions.Configuration;
+using PruebaTecnicaGabriel.Models;
 
 namespace PruebaTecnicaGabriel.Services
 {
@@ -8,17 +9,22 @@ namespace PruebaTecnicaGabriel.Services
         private readonly ContenedorPagos _contendor;
         private readonly ILogger<ProcesadorPagos> _log;
         private readonly string _nodeId;
+        private readonly IConfiguration _configuration;
+        private readonly ClienteMallaNodos _malla;
 
         public ProcesadorPagos(
             EncolamientoPagosPendiente cola,
             ContenedorPagos contenedor,
             IConfiguration configuration,
-            ILogger<ProcesadorPagos> log)
+            ClienteMallaNodos malla,
+            ILogger<ProcesadorPagos> log
+        )
         {
             _cola = cola;
             _contendor = contenedor;
             _log = log;
-
+            _malla = malla;
+            _configuration = configuration;
             _nodeId = configuration["Node:Id"]
                 ?? Environment.MachineName;
         }
@@ -53,93 +59,111 @@ namespace PruebaTecnicaGabriel.Services
         }
 
         private async Task ProcesoPagoAsync(
-            string transactionId,
+            string transaccionId,
             CancellationToken cancellationToken
         )
         {
 
 
-            if (!_contendor.TryGet(transactionId, out var pago) || pago is null)
+            if (!_contendor.TryTomarParaProcesar(
+                     transaccionId,
+                     _nodeId,
+                     out var pago) ||
+                 pago is null)
             {
-                _log.LogWarning(
-                    "[{NodeId}] No se encontró la transacción {TransactionId}",
+                _log.LogInformation(
+                    "[{NodeId}] No se pudo tomar {TransactionId}",
                     _nodeId,
-                    transactionId);
+                    transaccionId);
 
                 return;
             }
 
+            await _malla.ReplicarAsync(
+                pago,
+                cancellationToken);
+
+            var segundos = Random.Shared.Next(5, 11);
+
+            _log.LogInformation(
+                "[{NodeId}] Procesando {TransactionId}. Intento {Attempt}. Duración: {Seconds} segundos",
+                _nodeId,
+                transaccionId,
+                pago.NumeroIntento,
+                segundos);
+
+            await Task.Delay(
+                TimeSpan.FromSeconds(segundos),
+                cancellationToken);
+
+            var forzarPrimerFallo =
+                _configuration.GetValue<bool>(
+                    "Simulacion:ForzarFalloPrimerIntento");
+
+            bool debeFallar;
+
             lock (pago)
             {
-                if (pago.Estado != Enum_EstadoPago.Pendiente)
-                {
-                    _log.LogInformation(
-                        "[{NodeId}] La transacción {TransactionId} ya está en estado {Status}",
-                        _nodeId,
-                        transactionId,
-                        pago.Estado);
+                // Solamente el primer intento puede fallar.
+                // El siguiente nodo completará el segundo intento.
+                debeFallar =
+                    pago.NumeroIntento == 1 &&
+                    (
+                        forzarPrimerFallo ||
+                        Random.Shared.Next(0, 100) < 50
+                    );
+            }
 
+            if (!debeFallar)
+            {
+                if (!_contendor.MarcarCompleto(
+                        transaccionId,
+                        _nodeId,
+                        out pago) ||
+                    pago is null)
+                {
                     return;
                 }
 
-                pago.Estado = Enum_EstadoPago.Procesando;
-                pago.NodoPropietario = _nodeId;
+                _log.LogInformation(
+                    "[{NodeId}] Transacción {TransactionId} completada. Intento {Attempt}",
+                    _nodeId,
+                    transaccionId,
+                    pago.NumeroIntento);
+
+                await _malla.ReplicarAsync(
+                    pago,
+                    cancellationToken);
+
+                return;
             }
 
-            await Task.Delay(
-                TimeSpan.FromSeconds(
-                    Random.Shared.Next(1, 12)
-                ), cancellationToken
-            );
-            pago.FechaInicio = DateTime.Now;
+            if (!_contendor.MarcarError(
+                    transaccionId,
+                    _nodeId,
+                    "Fallo simulado durante el procesamiento.",
+                    out pago) ||
+                pago is null)
+            {
+                return;
+            }
 
-
-
-
-            var tiempoDemoraProceso = Random.Shared.Next(30, 120);
-
-            _log.LogInformation(
-                "[{NodeId}] Procesando transacción {TransactionId} durante {Seconds} segundos",
+            _log.LogWarning(
+                "[{NodeId}] Transacción {TransactionId} falló. Solicitando relevo",
                 _nodeId,
-                transactionId,
-                tiempoDemoraProceso
-            );
-            await Task.Delay(
-                TimeSpan.FromSeconds(tiempoDemoraProceso),
+                transaccionId);
+
+            // Primero comunica el estado Error.
+            await _malla.ReplicarAsync(
+                pago,
                 cancellationToken);
 
-            lock (pago)
-            {
-                if (pago.Estado == Enum_EstadoPago.Completo)
-                    return;
-            }
-
-            //Condicion de Error aleatorio
-            var auxError = Random.Shared.Next(1, 99);
-            if(auxError % 2 == 0)
-            {
-                pago.Estado = Enum_EstadoPago.Completo;
-                pago.FechaCompletado = DateTime.Now;
-                _log.LogInformation(
-                   "[{NodeId}] Transacción {TransactionId} completada correctamente",
-                   _nodeId,
-                   transactionId
-                );
-            }
-            else
-            {
-                pago.Estado = Enum_EstadoPago.Error;
-                pago.FechaFallo = DateTime.Now;
-                _log.LogInformation(
-                   "[{NodeId}] Transacción {TransactionId} ha fallado",
-                   _nodeId,
-                   transactionId
-                );
-            }
-
-            
-
-           
+            // Luego pide al siguiente nodo que la asuma.
+            await _malla.SolicitarReprocesoAsync(
+                transaccionId,
+                _nodeId,
+                cancellationToken);
         }
+
     }
 }

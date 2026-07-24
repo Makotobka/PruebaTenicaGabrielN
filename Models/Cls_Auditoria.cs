@@ -26,5 +26,19 @@
         /// Fecha de finalizacion
         /// </summary>
         public DateTime? FechaCompletado { get; set; }
+        /// <summary>
+        /// Intentos de control
+        /// </summary>
+        public int NumeroIntento { get; set; }
+        /// <summary>
+        /// Version ejecutada
+        /// </summary>
+        public long Version { get; set; }
+        /// <summary>
+        /// Ultimo error registrado
+        /// </summary>
+        public string? UltimoError { get; set; }
+
+
     }
 }
